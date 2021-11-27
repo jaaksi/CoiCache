@@ -5,22 +5,15 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.databinding.DataBindingUtil
 import androidx.lifecycle.lifecycleScope
 import com.google.gson.Gson
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.jaaksi.coicache.RequestApi
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
 import org.jaaksi.coicache.CoiCache
 import org.jaaksi.coicache.demo.api.Api
 import org.jaaksi.coicache.demo.databinding.ActivityMainBinding
 import org.jaaksi.coicache.demo.model.ApiResponse
 import org.jaaksi.coicache.demo.model.BannerBean
-import org.jaaksi.coicache.demo.net.ApiClient
 import org.jaaksi.coicache.demo.util.ToastUtil
+import org.jaaksi.coicache.extention.buildApi
 import org.jaaksi.coicache.type.CacheType
 
 class MainActivity : AppCompatActivity() {
@@ -46,9 +39,9 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     withContext(Dispatchers.IO) {
-                        CoiCache.get("data", BannerBean::class.java)
+                        CoiCache.get("banner", object : CacheType<ApiResponse<MutableList<BannerBean>>>() {})
                     }.let {
-                        ToastUtil.toast("rxGet data = ${it?.title}")
+                        ToastUtil.toast("banner = ${it?.data?.getOrNull(0)?.title}")
                     }
 
                 }
@@ -68,19 +61,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun request() {
         lifecycleScope.launch {
-            RequestApi(
-                flow {
-                    emit(ApiClient.create(Api::class.java).getBanner())
-                }
-            )
+            buildApi {
+                Api::class.java.create().getBanner()
+            }
 //                .cacheStrategy(CacheStrategy.CACHE_AND_REMOTE)
                 .cacheKey("banner")
-                .cacheable { return@cacheable it.errorCode == 0 && it.data != null }
+                .cacheable { it.hasData() }
 //                .buildCache(object : CacheType<ApiResponse<MutableList<BannerBean>>>() {})
-                .buildCacheWithCacheResult(object : CacheType<ApiResponse<MutableList<BannerBean>>>() {})
+                .buildFlowWithWrapper(object : CacheType<ApiResponse<MutableList<BannerBean>>>() {})
                 .flowOn(Dispatchers.IO)
                 .catch {
-                    ToastUtil.toast(it.message)
+//                    ToastUtil.toast(it.message)
                     binding.textview.text = it.toString()
                 }
                 .collect {

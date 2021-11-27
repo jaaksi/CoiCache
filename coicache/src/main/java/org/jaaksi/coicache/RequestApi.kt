@@ -14,12 +14,11 @@ import java.lang.reflect.Type
  * Created by jaaksi on 2021/4/29.
  * 用于发送网络请求
  */
-class RequestApi<T> constructor(private val api: Flow<T?>) {
-    private val rxCache = CoiCache
+class RequestApi<T>(private val api: Flow<T?>) {
     private var cacheTime: Long = CoiCache.NEVER_EXPIRE
     private var cacheStrategy: IStrategy = CacheStrategy.CACHE_AND_REMOTE
 
-    private lateinit var cacheKey: String
+    private var cacheKey: String? = null
     private var cacheableChecker: ((data: T) -> Boolean)? = null
 
     /**
@@ -57,14 +56,7 @@ class RequestApi<T> constructor(private val api: Flow<T?>) {
         return this
     }
 
-//    fun buildCache(type: Type): Flow<T?> {
-//        return doBuildCache(type)
-//    }
-
-    /**
-     * buildCache
-     */
-    fun buildCache(cacheType: CacheType<T>): Flow<T?> {
+    fun buildFlow(cacheType: CacheType<T>): Flow<T?> {
         return doBuildCache(cacheType.type)
     }
 
@@ -74,19 +66,13 @@ class RequestApi<T> constructor(private val api: Flow<T?>) {
         }
     }
 
-//    fun buildCacheWithCacheResult(type: Type): Flow<CacheResult<T?>> {
-//        return doBuildCacheWithCacheResult(type)
-//    }
-
-    /**
-     * buildCacheWithCacheResult
-     */
-    fun buildCacheWithCacheResult(cacheType: CacheType<T>): Flow<CacheWrapper<T?>> {
+    fun buildFlowWithWrapper(cacheType: CacheType<T>): Flow<CacheWrapper<T?>> {
         return doBuildCacheWithCacheResult(cacheType.type)
     }
 
     // 根据不同的策略处理
     private fun doBuildCacheWithCacheResult(type: Type): Flow<CacheWrapper<T?>> {
+        checkNotNull(cacheKey) { "必须设置cacheKey" }
         return api.map {
             val result = CacheWrapper(false, it)
             if (cacheStrategy !is NoStrategy) { // 如果缓存策略是不缓存
@@ -98,13 +84,14 @@ class RequestApi<T> constructor(private val api: Flow<T?>) {
             }
             result
         }.let {
-            cacheStrategy.execute(cacheKey, it, type)
+            cacheStrategy.execute(cacheKey!!, it, type)
         }
     }
 
     private fun writeCache(t: T) {
         GlobalScope.launch {
-            rxCache.put(cacheKey, t)
+            // bugfix: 修正缓存过期时间无效
+            CoiCache.put(cacheKey!!, t, this@RequestApi.cacheTime)
         }
     }
 }

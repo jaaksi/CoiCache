@@ -21,6 +21,7 @@ import java.lang.reflect.Type
 object CoiCache {
 
     const val TAG = "CoiCache"
+
     // 永久缓存虽然不会过期，但是由于最大缓存size的限制，可能会由于lru被移除，所以不推荐使用该库来作为重要信息存储
     const val NEVER_EXPIRE = -1L //缓存过期时间，默认永久缓存
     private const val MAX_CACHE_SIZE = 50 * 1024 * 1024L // 50MB
@@ -99,6 +100,7 @@ object CoiCache {
      *
      * @param duration 毫秒ms
      */
+    @Deprecated("CoiCache is a cache library, not recommended for data storage.")
     fun <T> put(key: String, value: T, duration: Long = NEVER_EXPIRE): Boolean {
         check(duration == NEVER_EXPIRE || duration > 0)
         return cacheCore.save(key, CacheEntity(value, duration))
